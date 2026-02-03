@@ -1,7 +1,7 @@
 from fast_alpr import ALPR
 import cv2
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from pydantic import BaseModel, Field
 import base64
 from typing import Dict, Any
@@ -75,3 +75,13 @@ async def process_base64_image(data: Base64Image) -> Dict[str, Any]:
             status_code=500, detail=f"An error occurred during processing: {e}"
         )
 
+@app.post("/process-image/")
+async def process_image(file: UploadFile = File(...)):
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+    
+    alpr_results = alpr.predict(image)
+    return alpr_results
