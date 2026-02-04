@@ -2,11 +2,16 @@ from fast_alpr import ALPR
 import cv2
 import numpy as np
 from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 import base64
 from typing import Dict, Any
 
-app = FastAPI()
+mcp = FastMCP()
+mcp_app = mcp.http_app(path="/")
+app = FastAPI(lifespan=mcp_app.lifespan)
+app.mount("/mcp", mcp_app)  # MCP endpoint at /mcp
+
 alpr = ALPR(
             detector_model="yolo-v9-t-384-license-plate-end2end",
             ocr_model="cct-xs-v1-global-model",
@@ -85,3 +90,16 @@ async def process_image(file: UploadFile = File(...)):
     
     alpr_results = alpr.predict(image)
     return alpr_results
+
+@mcp.tool()
+def detect_license_plate(image_base64: str) -> Dict[str, Any]:
+    """Detect license plate from a Base64 encoded image."""
+    try:
+        image_bytes = base64.b64decode(image_base64)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        decoded_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        alpr_results = alpr.predict(decoded_image)
+        return {"results": alpr_results}
+    except Exception as e:
+        return {"error": str(e)}

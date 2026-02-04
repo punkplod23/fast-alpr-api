@@ -1,6 +1,9 @@
 # Use official Python image with tag matching project's minimum requirement
 FROM python:3.13-slim
 
+# Install uv specifically
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 # Set a working directory
 WORKDIR /app
 
@@ -16,18 +19,21 @@ RUN apt-get update \
         ffmpeg \
         libgl1 \
     && rm -rf /var/lib/apt/lists/*
+    
+# Copy dependency files first for better caching
+COPY pyproject.toml uv.lock ./
 
-# Copy only dependency files first for layer caching
-COPY pyproject.toml README.md /app/
+# Install dependencies without copying the whole project yet
+# --frozen ensures we use the exact lockfile versions
+RUN uv sync --frozen --no-install-project --no-dev
 
-# Install pip-tools for PEP 517 builds if needed, then install dependencies
-RUN pip install --no-cache-dir pip wheel
-RUN pip install --no-cache-dir "fast-alpr[onnx]>=0.3.0" "fastapi[standard]"
+# Copy the rest of the application
+COPY . .
 
-# Copy app source
-COPY . /app
+# Place the uv-created virtualenv on the PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose port used by Uvicorn (80 for convenience)
+# Expose port
 EXPOSE 80
 
 # Run with Uvicorn
