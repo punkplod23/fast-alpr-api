@@ -13,9 +13,4 @@ apply:
 clean:
 	$(KUBECTL) delete -f alpnr-api.yaml --ignore-not-found
 
-create-ghcr-secret:
-	kubectl create secret docker-registry ghcr-secret \
-	  --docker-server=ghcr.io \
-	  --docker-username="Gareth G" \
-	  --docker-password=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 \
-	  --docker-email=gareth.gwyther@gmail.com
+
